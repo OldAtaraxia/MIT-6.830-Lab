@@ -757,3 +757,229 @@ grade will be based on the quality of your writeup and our subjective evaluation
 will also be published on gradescope after we finish grading your assignment.
 
 We had a lot of fun designing this assignment, and we hope you enjoy hacking on it!
+ 
+ 大致翻译了一下
+ [simple-db-hw-2021/lab1.md at master · MIT-DB-Class/simple-db-hw-2021 (github.com)](https://github.com/MIT-DB-Class/simple-db-hw-2021/blob/master/lab1.md)
+
+`simple db`
+
+要做的事:
+
+* 实现类`Tuple`, `TupleDesc`, 已经实现的类有`Field`, `IntField`, `StringField`, `Type`, 这里只需要支持整数和定长字符串字段, 而且tuple也是定长的
+* 实现`Catalog`
+* 实现`BufferPool`的构造函数和`getPage`方法
+* 实现`access`方法, `HeapPage`和`HeapFile`以及相关的ID类。这些文件的很大一部分已经为你写好了。
+* 实现operation SeqScan
+* 通过`ScanTest system Test`
+
+> 不需要管有关锁、事务和恢复的东西(包括函数参数)
+
+## Getting started
+
+这个simple db用的构建工具是Ant. Java的三大构建工具是Ant, Maven和Grade, 不知道为什么要用最难用的一个...
+
+安装ant:
+
+* 在[Apache Ant - Welcome](https://ant.apache.org/)下载解压
+* 设置环境变量ANT_HOME, path里加%ANT_HOME%/bin, classpath加%ANT_HOME%/lib
+
+运行测试用例
+
+```powershell
+ant test
+ant runtest -Dtest=TupleTest
+```
+
+常用的ant命令:
+
+| Command                        | Description                                                  |
+| ------------------------------ | ------------------------------------------------------------ |
+| ant                            | Build the default target (for simpledb, this is dist).       |
+| ant -projecthelp               | List all the targets in `build.xml` with descriptions.       |
+| ant dist                       | Compile the code in src and package it in `dist/simpledb.jar`. |
+| ant test                       | Compile and run all the unit tests.                          |
+| ant runtest -Dtest=testname    | Run the unit test named `testname`.                          |
+| ant systemtest                 | Compile and run all the system tests.                        |
+| ant runsystest -Dtest=testname | Compile and run the system test named `testname`.            |
+
+用`idea`打开项目文件夹之后右键各个文件夹选择"mark directory as"标记一下每个目录的用途
+
+## `SimpleDB` Architecture and Implementation Guide
+
+`SimpleDB`的组成:
+
+* Classes that represent fields, tuples, and tuple schemas;
+* Classes that apply predicates and conditions to tuples;
+* One or more access methods (e.g., heap files) that store relations on disk and provide a way to iterate through tuples of those relations;
+* A collection of operator classes (e.g., select, join, insert, delete, etc.) that process tuples;
+* A `buffer pool` that caches active tuples and pages in memory and handles concurrency control and transactions (neither of which you need to worry about for this lab); and,
+* A catalog that stores information about available tables and their schemas.
+
+应该有但是没有的东西:
+
+- (In this lab), a SQL front end or parser that allows you to type queries directly into SimpleDB. Instead, queries are built up by chaining a set of operators together into a hand-built query plan (see [Section 2.7](https://github.com/MIT-DB-Class/simple-db-hw-2021/blob/master/lab1.md#query_walkthrough)). We will provide a simple parser for use in later labs.
+- Views.
+- Data types except integers and fixed length strings.
+- (In this lab) Query optimizer.
+- (In this lab) Indices.
+
+> 之后会说一些具体类的实现
+
+## DataBase Class
+
+数据库类提供了对静态对象集合的访问，这些对象是数据库的全局状态。特别是，这包括访问目录（数据库中所有表的列表）、缓冲池（当前驻留在内存中的数据库文件页的集合）和日志文件的方法。
+
+### Fields and Tuples
+
+Tuples由Field组成, Field则是一个接口, 不同的数据类型都可以实现. Tuple是由底层访问方法(比如B树)创建的. Tuples也有一个"类型", 由`TupleDesc`来描述. 这个对象由一些`Type`对象组成, Tuple中的每一个Field都对应一个, 来描述字段的类型
+
+> Type用的枚举类的实现, 感觉挺骚的
+
+exercise 1: 完成下列方法
+
+- rc/java/simpledb/storage/TupleDesc.java
+- src/java/simpledb/storage/Tuple.java
+
+之后通过TupleTest和TupleDescTest
+
+### Catalog
+
+class Catalog由a list of the tables and schemas of the tables that are currently in the database组成.
+
+全局有一个Catalog目录The global catalog is a single instance of Catalog that is allocated for the entire SimpleDB process. The global catalog can be retrieved via the method Database.getCatalog(), and the same goes for the global buffer pool ( using Database.getBufferPool()).
+
+需要让它支持添加一个新的表以及获取一个特定表的信息的能力. 与每个表相关联的是一个TupleDesc对象, 它允许操作者确定一个表的字段类型和数量
+
+exercise 2: 完成以下方法
+
+- src/java/simpledb/common/Catalog.java
+
+之后通过CatalogTest
+
+### Buffer Pool
+
+![image-20211212125428540](https://gitee.com/oldataraxia/pic-bad/raw/master/img/image-20211212125428540.png)
+
+负责在内存中缓存最近从磁盘读取的页面, 由固定数量的pages组成, 数量由构造函数中的参数`numPages`决定.当前只需要实现构造函数和`getPage`方法. 如果当前page数量超过最大值, 抛出一个`DBException`.
+
+数据库类提供了一个静态方法，Database.getBufferPool()，它返回整个SimpleDB进程的一个BufferPool实例的引用。
+
+exercise 3: 完成构造函数和`getPage()`方法, 用`DbFile.readPage`方法来访问page
+
+- src/java/simpledb/storage/BufferPool.java
+
+这一步没有单元测试, 跟下一步一起测试
+
+### HeapFile access method
+
+Access methods provide a way to read or write data from disk that is arranged in a specific way. 这次需要实现一个heap file access method
+
+一个heap file就是一组page, 每个page由固定数量的字节(由常量BufferPool.DEFAULT_PAGE_SIZE来决定)组成, 用于存储tuple和自己的header. 在simpleDB中数据库中的每个表都有一个HeapFile对象. HeapFIle中的每个页面is arranged as a set of slots,each of which can hold one tuple. Header里有一个bitmap with one bit per tuple slot.如果bit是1说明当前的tuple是有效的, 否则是无效的(比如被删除的或者还没有初始化的). HeapFile的页是HeapPage类型, 实现了page接口. 页被存在缓冲池中, 但是由HeapFile类来读写
+
+SimpleDB在磁盘上存储HeapFile的格式或多或少与它们在内存中的存储格式相同。每个文件由磁盘上连续排列的page data组成, 每个page有一或多个代表header的的字节组成, 之后是实际page contene的page大小字节(page_size).每个tuple需要tuple size * 8 bits for its content and 1 bit for the header.所以一个page可以容纳的tuple数是
+
+_tuples per page_ = floor((_page size_ * 8) / (_tuple size_ * 8 + 1))
+
+知道每个page的tuple数之后,header需要的字节数也就知道了
+
+headerBytes = ceiling(tupsPerPage/8)
+
+每个字节的地位代表文件中较早的槽的状态, 最后一个字节的高阶位可能不对应于文件中实际存在的槽，因为槽的数量可能不是8的倍数
+
+Exercise 4: 
+
+- src/java/simpledb/storage/HeapPageId.java
+- src/java/simpledb/storage/RecordId.java
+- src/java/simpledb/storage/HeapPage.java
+
+实现HeapPage的getNumEmptySlots()` and `isSlotUsed(), 可以参照HeapPage的其他文件和`src/simpledb/HeapFileEncoder.java`
+
+如果再实现一个遍历tuples in page的迭代器类
+
+之后就可以 pass the unit tests in HeapPageIdTest, RecordIDTest, and HeapPageReadTest
+
+Exercise 5:
+
+- src/java/simpledb/storage/HeapFile.java
+
+To read a page from disk, you will first need to calculate the correct offset in the file. Hint: you will need random access to the file in order to read and write pages at arbitrary offsets. You should not call BufferPool methods when reading a page from disk.
+
+还需要实现`HeapFile.iterator`方法,  iterate through through the tuples of each page in the HeapFile. 迭代器要用`BufferPool.getPage()`方法来访问HeapFile的pages. 这个方法吧page加载进buffer pool
+
+之后就可以pass the unit tests in HeapFileReadTest.
+
+### Operators
+
+具体的运算部分来实现关系代数的操作. 在SimpleDB中，操作符是基于迭代器的；每个操作符都实现了DbIterator接口。Operators are connected together into a plan by passing lower-level operators into the constructors of higher-level operators
+
+At the top of the plan, the program interacting with SimpleDB simply calls getNext on the root operator; this operator then calls getNext on its children, and so on, until these leaf operators are called. They fetch tuples from disk and pass them up the tree (as return arguments to getNext); tuples以这种方式在plan里传播until they are output at the root or combined or rejected by another operator in the plan.
+
+Exercise 5: 实现顺序遍历方法
+
+- src/java/simpledb/execution/SeqScan.java
+
+sequentially scans all of the tuples from the pages of the table specified by the `tableid` in the constructor. This operator should access tuples through the `DbFile.iterator()` method.
+
+然后通过ScanTest system test
+
+### Simple Query
+
+> 就是说明这些不同的组件是如何连接在一起以处理一个简单的查询。
+
+假设现在有数据文件`some_data_file.txt`:
+
+```
+1,1,1
+2,2,2 
+3,4,4
+```
+
+把它存入simpleDB
+
+```bash
+java -jar dist/simpledb.jar convert some_data_file.txt 3
+```
+
+实现在这个文件上简单的顺序查询:
+
+```java
+package simpledb;
+import java.io.*;
+
+public class test {
+
+    public static void main(String[] argv) {
+
+        // construct a 3-column table schema
+        Type types[] = new Type[]{ Type.INT_TYPE, Type.INT_TYPE, Type.INT_TYPE };
+        String names[] = new String[]{ "field0", "field1", "field2" };
+        TupleDesc descriptor = new TupleDesc(types, names);
+
+        // create the table, associate it with some_data_file.dat
+        // and tell the catalog about the schema of this table.
+        HeapFile table1 = new HeapFile(new File("some_data_file.dat"), descriptor);
+        Database.getCatalog().addTable(table1, "test");
+
+        // construct the query: we use a simple SeqScan, which spoonfeeds
+        // tuples via its iterator.
+        TransactionId tid = new TransactionId();
+        SeqScan f = new SeqScan(tid, table1.getId());
+
+        try {
+            // and run it
+            f.open();
+            while (f.hasNext()) {
+                Tuple tup = f.next();
+                System.out.println(tup);
+            }
+            f.close();
+            Database.getBufferPool().transactionComplete(tid);
+        } catch (Exception e) {
+            System.out.println ("Exception : " + e);
+        }
+    }
+
+}
+```
+
+> 先创建一个TupleDesc对象, 并把Type对象的数组和String字段名的数组传给他, 创建好之后初始化一个HeapFile对象, 代表存储在some_data_File.dat的表.之后把它添加到目录中. 这样就完成了数据库系统的初始化. 之后就开始创建查询计划.Our plan consists only of the SeqScan operator that scans the tuples from disk. 操作符都是通过引用相应的表（如果是SeqScan）或子操作符（如果是Filter）来实例化.后，测试程序在SeqScan操作符上反复调用hasNext和next,当tuple从SeqScan中输出时，它们会在命令行上打印出来。
