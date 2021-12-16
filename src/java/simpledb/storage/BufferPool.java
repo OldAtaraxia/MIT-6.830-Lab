@@ -7,6 +7,7 @@ import simpledb.common.DeadlockException;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
+import javax.xml.crypto.Data;
 import java.io.*;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +33,8 @@ public class BufferPool {
     other classes. BufferPool should use the numPages argument to the
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
+    private int numPages;
+    private ConcurrentHashMap<Integer, Page> pages;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -39,7 +42,7 @@ public class BufferPool {
      * @param numPages maximum number of pages in this buffer pool.
      */
     public BufferPool(int numPages) {
-        // some code goes here
+        this.numPages = numPages;
     }
     
     public static int getPageSize() {
@@ -73,8 +76,16 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        if(this.pages.containsKey(pid.getTableId())) {
+            return this.pages.get(pid.hashCode());
+        } else {
+            DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+            if(dbFile == null || dbFile.readPage(pid) == null) {
+                throw new DbException("Page does not exist");
+            }
+            this.pages.put(pid.hashCode(), dbFile.readPage(pid));
+            return this.pages.get(pid.hashCode());
+        }
     }
 
     /**
