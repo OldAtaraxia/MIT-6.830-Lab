@@ -18,17 +18,49 @@ import java.util.concurrent.ConcurrentHashMap;
  * For now, this is a stub catalog that must be populated with tables by a
  * user program before it can be used -- eventually, this should be converted
  * to a catalog that reads a catalog table from disk.
- * 
+ *
  * @Threadsafe
  */
 public class Catalog {
+
+    public static class Table {
+        private DbFile file;
+        private String name;
+        private String pkeyField;
+
+        public Table(DbFile file, String name, String pkeyField) {
+            this.file = file;
+            this.name = name;
+            this.pkeyField = pkeyField;
+        }
+
+        public DbFile getFile() {
+            return this.file;
+        }
+
+        public String getName() {
+            return this.name;
+        }
+
+        public String getPkeyField() {
+            return this.pkeyField;
+        }
+
+        public int getFileId() {
+            return this.file.getId();
+        }
+    }
+
+    ConcurrentHashMap<String, Table> nameTableMap;
+    ConcurrentHashMap<Integer, Table> idTableMap;
 
     /**
      * Constructor.
      * Creates a new, empty catalog.
      */
     public Catalog() {
-        // some code goes here
+        nameTableMap = new ConcurrentHashMap<>();
+        idTableMap = new ConcurrentHashMap<>();
     }
 
     /**
@@ -41,7 +73,13 @@ public class Catalog {
      * @param pkeyField the name of the primary key field
      */
     public void addTable(DbFile file, String name, String pkeyField) {
-        // some code goes here
+        // the table can override the previous table with the same name
+        if(nameTableMap.containsKey(name)) {
+            idTableMap.remove(nameTableMap.get(name).getFileId());
+        }
+        Table table = new Table(file, name, pkeyField);
+        nameTableMap.put(name, table);
+        idTableMap.put(file.getId(), table);
     }
 
     public void addTable(DbFile file, String name) {
@@ -64,8 +102,10 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) throws NoSuchElementException {
-        // some code goes here
-        return 0;
+        if(name != null && nameTableMap.containsKey(name)) {
+            return nameTableMap.get(name).getFileId();
+        }
+        throw new NoSuchElementException();
     }
 
     /**
@@ -75,8 +115,12 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        if(!this.idTableMap.containsKey(tableid)) {
+            throw new NoSuchElementException();
+        } else {
+            TupleDesc tupleDesc = this.idTableMap.get(tableid).getFile().getTupleDesc();
+            return tupleDesc;
+        }
     }
 
     /**
@@ -86,30 +130,36 @@ public class Catalog {
      *     function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        if(idTableMap.containsKey(tableid)) {
+            return this.idTableMap.get(tableid).getFile();
+        }
+        throw new NoSuchElementException();
     }
 
     public String getPrimaryKey(int tableid) {
-        // some code goes here
-        return null;
+        if(idTableMap.containsKey(tableid)) {
+            return this.idTableMap.get(tableid).getPkeyField();
+        }
+        throw new NoSuchElementException();
     }
 
     public Iterator<Integer> tableIdIterator() {
-        // some code goes here
-        return null;
+        return this.idTableMap.keySet().iterator();
     }
 
     public String getTableName(int id) {
-        // some code goes here
-        return null;
+        if(idTableMap.containsKey(id)) {
+            return this.idTableMap.get(id).getName();
+        }
+        throw new NoSuchElementException();
     }
-    
+
     /** Delete all tables from the catalog */
     public void clear() {
-        // some code goes here
+        this.idTableMap.clear();
+        this.nameTableMap.clear();
     }
-    
+
     /**
      * Reads the schema from a file and creates the appropriate tables in the database.
      * @param catalogFile
@@ -119,7 +169,7 @@ public class Catalog {
         String baseFolder=new File(new File(catalogFile).getAbsolutePath()).getParent();
         try {
             BufferedReader br = new BufferedReader(new FileReader(catalogFile));
-            
+
             while ((line = br.readLine()) != null) {
                 //assume line is of the format name (field type, field type, ...)
                 String name = line.substring(0, line.indexOf("(")).trim();
