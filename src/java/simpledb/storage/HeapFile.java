@@ -163,7 +163,7 @@ public class HeapFile implements DbFile {
                     return true;
                 } else {
                     // time to update iterator for next page
-                    if(currentPageNo == heapfile.numPages() - 1) {
+                    if(currentPageNo >= heapfile.numPages() - 1) {
                         return false;
                     }
                     iterator = tupleIteratorUtil(++currentPageNo);

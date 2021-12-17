@@ -37,7 +37,7 @@ public class TupleDesc implements Serializable {
         }
     }
 
-    private ArrayList<TDItem> items = new ArrayList<TDItem>();
+    private List<TDItem> items;
 
     /**
      * @return
@@ -62,9 +62,9 @@ public class TupleDesc implements Serializable {
      *            be null.
      */
     public TupleDesc(Type[] typeAr, String[] fieldAr) {
-        this.items = new ArrayList<TDItem>(typeAr.length);
+        items = new ArrayList<>();
         for(int i = 0; i < typeAr.length; i++) {
-            this.items.add(new TDItem(typeAr[i], fieldAr[i]));
+            items.add(new TDItem(typeAr[i], fieldAr[i]));
         }
     }
 
@@ -151,8 +151,8 @@ public class TupleDesc implements Serializable {
      */
     public int getSize() {
         int size = 0;
-        for(int i = 0; i < this.items.toArray().length; i++) {
-            size += this.items.get(i).fieldType.getLen();
+        for(item: items) {
+            size += item.fieldType.getLen();
         }
         return size;
     }

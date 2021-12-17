@@ -1,14 +1,11 @@
 package simpledb.execution;
 
 import simpledb.common.Database;
-import simpledb.storage.DbFile;
+import simpledb.storage.*;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 import simpledb.common.Type;
 import simpledb.common.DbException;
-import simpledb.storage.DbFileIterator;
-import simpledb.storage.Tuple;
-import simpledb.storage.TupleDesc;
 
 import java.util.*;
 
@@ -23,7 +20,7 @@ public class SeqScan implements OpIterator {
     TransactionId tid;
     int tableid;
     String tableAlias;
-    Iterator<Tuple> iterator;
+    DbFileIterator iterator;
 
     /**
      * Creates a sequential scan over the specified table as a part of the
@@ -45,7 +42,8 @@ public class SeqScan implements OpIterator {
         this.tid = tid;
         this.tableid = tableid;
         this.tableAlias = tableAlias;
-        // iterator = Database.getBufferPool().getPage();
+        HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(tableid);
+        this.iterator = heapFile.iterator(tid);
     }
 
     /**
@@ -60,8 +58,7 @@ public class SeqScan implements OpIterator {
     /**
      * @return Return the alias of the table this operator scans.
      * */
-    public String getAlias()
-    {
+    public String getAlias() {
         return this.tableAlias;
     }
 
@@ -87,7 +84,7 @@ public class SeqScan implements OpIterator {
     }
 
     public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
+        iterator.open();
     }
 
     /**
@@ -105,22 +102,20 @@ public class SeqScan implements OpIterator {
     }
 
     public boolean hasNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return false;
+        return iterator.hasNext();
     }
 
     public Tuple next() throws NoSuchElementException,
             TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        return iterator.next();
     }
 
     public void close() {
-        // some code goes here
+        iterator.close();
     }
 
     public void rewind() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // some code goes here
+        iterator.rewind();
     }
 }

@@ -72,7 +72,7 @@ public class HeapPage implements Page {
         @return the number of tuples on this page
     */
     private int getNumTuples() {        
-        return (int) Math.floor((BufferPool.getPageSize()*8) / (td.getSize() * 8 + 1));
+        return (int) Math.floor((BufferPool.getPageSize() * 8.0 ) / (td.getSize() * 8 + 1));
     }
 
     /**
@@ -80,7 +80,7 @@ public class HeapPage implements Page {
      * @return the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      */
     private int getHeaderSize() {        
-        return (int) Math.ceil(getNumTuples() / 8);
+        return (int) Math.ceil(getNumTuples() / 8.0);
                  
     }
     
@@ -122,7 +122,10 @@ public class HeapPage implements Page {
     private Tuple readNextTuple(DataInputStream dis, int slotId) throws NoSuchElementException {
         // if associated bit is not set, read forward to the next tuple, and
         // return null.
-        if (!isSlotUsed(slotId)) {
+        if(slotId < 0 || slotId * 8 > header.length) {
+            System.out.println("slotId: " + slotId + " header.length: " + header.length);
+            throw new NoSuchElementException();
+        } else if (!isSlotUsed(slotId)) {
             for (int i=0; i < td.getSize(); i++) {
                 try {
                     dis.readByte();
@@ -177,7 +180,7 @@ public class HeapPage implements Page {
         }
 
         // create the tuples
-        for (int i=0; i<tuples.length; i++) {
+        for (int i = 0; i < tuples.length; i++) {
 
             // empty slot
             if (!isSlotUsed(i)) {
@@ -193,7 +196,7 @@ public class HeapPage implements Page {
             }
 
             // non-empty slot
-            for (int j=0; j<td.numFields(); j++) {
+            for (int j = 0; j < td.numFields(); j++) {
                 Field f = tuples[i].getField(j);
                 try {
                     f.serialize(dos);
@@ -301,9 +304,12 @@ public class HeapPage implements Page {
      * Returns true if associated slot on this page is filled.
      */
     public boolean isSlotUsed(int i) {
-        int quot = i/8;
-        int remain = i%8;
-        return (header[quot]&(1<<remain))!=0;
+//        if(i < 0 || (i / 8) >= header.length) {
+//            throw new IllegalArgumentException("Slot number out of range");
+//        }
+        int quot = i / 8;
+        int remain = i % 8;
+        return (header[quot]&(1 << remain)) != 0;
     }
 
     /**
