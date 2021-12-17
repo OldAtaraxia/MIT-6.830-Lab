@@ -6,6 +6,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Tuple maintains information about the contents of a tuple. Tuples have a
@@ -16,7 +17,7 @@ public class Tuple implements Serializable {
 
     private static final long serialVersionUID = 1L;
     TupleDesc tableSchema; // 描述当前表的schema
-    ArrayList<Field> fields; // 存储字段
+    List<Field> fields; // 存储字段
     RecordId recordId;
 
     /**
@@ -28,15 +29,9 @@ public class Tuple implements Serializable {
      */
     public Tuple(TupleDesc td) {
         this.tableSchema = td;
-        fields = new ArrayList<Field>();
-        Iterator<TupleDesc.TDItem> iterator = td.iterator();
-        while(iterator.hasNext()) {
-            TupleDesc.TDItem item = iterator.next();
-            if(item.fieldType == Type.INT_TYPE) {
-                fields.add(new IntField(0));
-            } else if(item.fieldType == Type.STRING_TYPE) {
-                fields.add(new StringField("", 128));
-            }
+        fields = new ArrayList<>();
+        for(int i = 0; i < td.numFields(); i++) {
+            fields.add(null);
         }
     }
 
@@ -99,7 +94,7 @@ public class Tuple implements Serializable {
         StringBuilder sb = new StringBuilder();
         for(int i = 0; i < this.fields.size(); i++) {
             sb.append(this.fields.get(i).toString());
-            sb.append('\t');
+            sb.append(" ");
         }
         return sb.toString();
     }
@@ -119,6 +114,9 @@ public class Tuple implements Serializable {
     public void resetTupleDesc(TupleDesc td)
     {
         this.tableSchema = td;
-        this.fields = new ArrayList<Field>();
+        this.fields = new ArrayList<>();
+        for(int i = 0; i < td.numFields(); i++) {
+            fields.add(null);
+        }
     }
 }

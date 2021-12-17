@@ -43,6 +43,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         this.numPages = numPages;
+        this.pages = new ConcurrentHashMap<Integer, Page>();
     }
     
     public static int getPageSize() {
@@ -76,11 +77,11 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
-        if(this.pages.containsKey(pid.getTableId())) {
+        if(this.pages.containsKey(pid.hashCode())) {
             return this.pages.get(pid.hashCode());
         } else {
             DbFile dbFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
-            if(dbFile == null || dbFile.readPage(pid) == null) {
+            if(dbFile == null) {
                 throw new DbException("Page does not exist");
             }
             this.pages.put(pid.hashCode(), dbFile.readPage(pid));

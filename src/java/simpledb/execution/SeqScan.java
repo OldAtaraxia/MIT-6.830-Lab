@@ -8,6 +8,7 @@ import simpledb.common.Type;
 import simpledb.common.DbException;
 
 import java.util.*;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * SeqScan is an implementation of a sequential scan access method that reads
@@ -42,8 +43,6 @@ public class SeqScan implements OpIterator {
         this.tid = tid;
         this.tableid = tableid;
         this.tableAlias = tableAlias;
-        HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(tableid);
-        this.iterator = heapFile.iterator(tid);
     }
 
     /**
@@ -84,6 +83,8 @@ public class SeqScan implements OpIterator {
     }
 
     public void open() throws DbException, TransactionAbortedException {
+        HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(tableid);
+        this.iterator = heapFile.iterator(tid);
         iterator.open();
     }
 
@@ -98,7 +99,14 @@ public class SeqScan implements OpIterator {
      *         prefixed with the tableAlias string from the constructor.
      */
     public TupleDesc getTupleDesc() {
-        return Database.getCatalog().getTupleDesc(this.tableid);
+        TupleDesc tupleDesc = Database.getCatalog().getTupleDesc(this.tableid);
+        Type[] types = new Type[tupleDesc.numFields()];
+        String[] fieldNames = new String[tupleDesc.numFields()];
+        for(int i = 0; i < tupleDesc.numFields(); i++) {
+            types[i] = tupleDesc.getFieldType(i);
+            fieldNames[i] = this.tableAlias + "." + tupleDesc.getFieldName(i);
+        }
+        return new TupleDesc(types, fieldNames);
     }
 
     public boolean hasNext() throws TransactionAbortedException, DbException {
