@@ -127,26 +127,24 @@ public class HeapFile implements DbFile {
 
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
-        return new HeapFileIterator(this, tid);
+        return new HeapFileIterator(tid);
     }
 
-    public static class HeapFileIterator implements DbFileIterator {
+    public class HeapFileIterator implements DbFileIterator {
 
-        private HeapFile heapfile;
         private int currentPageNo;
         private Iterator<Tuple> iterator;
         TransactionId tid;
 
-        public HeapFileIterator(HeapFile heapfile, TransactionId tid) {
-            this.heapfile = heapfile;
+        public HeapFileIterator(TransactionId tid) {
             this.tid = tid;
         }
 
         private Iterator<Tuple> tupleIteratorUtil(int pageNo) throws DbException, TransactionAbortedException {
-            if(pageNo < 0 || pageNo >= heapfile.numPages()) {
+            if(pageNo < 0 || pageNo >= HeapFile.this.numPages()) {
                 throw new DbException("Page number out of bound");
             }
-            HeapPageId heapPageId = new HeapPageId(heapfile.getId(), pageNo);
+            HeapPageId heapPageId = new HeapPageId(HeapFile.this.getId(), pageNo);
             HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_ONLY);
             return page.iterator();
         }
@@ -164,7 +162,7 @@ public class HeapFile implements DbFile {
                     return true;
                 } else {
                     // time to update iterator for next page
-                    if(currentPageNo >= heapfile.numPages() - 1) {
+                    if(currentPageNo >= HeapFile.this.numPages() - 1) {
                         return false;
                     }
                     iterator = tupleIteratorUtil(++currentPageNo);
