@@ -71,21 +71,23 @@ public class HeapFile implements DbFile {
     public Page readPage(PageId pid){
         int tableid = pid.getTableId();
         int pageno = pid.getPageNumber();
+        int pageSize = BufferPool.getPageSize();
         byte[] data = null;
         RandomAccessFile raf = null;
         try {
             raf = new RandomAccessFile(file, "r");
-            if((long) (pageno + 1) * Database.getBufferPool().getPageSize() > raf.length()) {
+            if((long) (pageno + 1) * pageSize > raf.length()) {
                 throw new IllegalArgumentException("PageId " + pid + " does not exist");
             }
-            data = new byte[Database.getBufferPool().getPageSize()];
-            raf.seek(pageno * Database.getBufferPool().getPageSize());
-            raf.read(data, 0, Database.getBufferPool().getPageSize());
+            data = new byte[pageSize];
+            raf.seek((long) pageno * pageSize); // seek the offset
+            raf.read(data, 0, pageSize);
             return new HeapPage((HeapPageId) pid, data);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             try {
+                assert raf != null;
                 raf.close();
             } catch (IOException e) {
                 e.printStackTrace();
