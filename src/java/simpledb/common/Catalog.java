@@ -1,6 +1,5 @@
 package simpledb.common;
 
-import simpledb.common.Type;
 import simpledb.storage.DbFile;
 import simpledb.storage.HeapFile;
 import simpledb.storage.TupleDesc;
@@ -26,7 +25,7 @@ public class Catalog {
     public static class Table {
         private DbFile file;
         private String name;
-        private String pkeyField;
+        private String pkeyField; // 主键
 
         public Table(DbFile file, String name, String pkeyField) {
             this.file = file;
@@ -51,16 +50,18 @@ public class Catalog {
         }
     }
 
-    ConcurrentHashMap<String, Table> nameTableMap;
-    ConcurrentHashMap<Integer, Table> idTableMap;
+    private Map<String, Table> nameToTable;
+    private Map<Integer, Table> idToTable;
+    private List<Table> tables;
 
     /**
      * Constructor.
      * Creates a new, empty catalog.
      */
     public Catalog() {
-        nameTableMap = new ConcurrentHashMap<>();
-        idTableMap = new ConcurrentHashMap<>();
+        nameToTable = new ConcurrentHashMap<>();
+        idToTable = new ConcurrentHashMap<>();
+        tables = new ArrayList<>();
     }
 
     /**
@@ -74,16 +75,17 @@ public class Catalog {
      */
     public void addTable(DbFile file, String name, String pkeyField) {
         // the table can override the previous table with the same name
-        if(nameTableMap.containsKey(name)) {
-            idTableMap.remove(nameTableMap.get(name).getFileId());
+        if(nameToTable.containsKey(name)) {
+            idToTable.remove(nameToTable.get(name).getFileId());
         }
         Table table = new Table(file, name, pkeyField);
-        nameTableMap.put(name, table);
-        idTableMap.put(file.getId(), table);
+        nameToTable.put(name, table);
+        idToTable.put(file.getId(), table);
+        tables.add(table);
     }
 
     public void addTable(DbFile file, String name) {
-        addTable(file, name, "");
+        addTable(file, name, null);
     }
 
     /**
@@ -102,8 +104,8 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) throws NoSuchElementException {
-        if(name != null && nameTableMap.containsKey(name)) {
-            return nameTableMap.get(name).getFileId();
+        if(name != null && nameToTable.containsKey(name)) {
+            return nameToTable.get(name).getFileId();
         }
         throw new NoSuchElementException();
     }
@@ -115,10 +117,10 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
-        if(!this.idTableMap.containsKey(tableid)) {
+        if(!this.idToTable.containsKey(tableid)) {
             throw new NoSuchElementException();
         } else {
-            TupleDesc tupleDesc = this.idTableMap.get(tableid).getFile().getTupleDesc();
+            TupleDesc tupleDesc = this.idToTable.get(tableid).getFile().getTupleDesc();
             return tupleDesc;
         }
     }
@@ -130,34 +132,35 @@ public class Catalog {
      *     function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        if(idTableMap.containsKey(tableid)) {
-            return this.idTableMap.get(tableid).getFile();
+        if(idToTable.containsKey(tableid)) {
+            return this.idToTable.get(tableid).getFile();
         }
         throw new NoSuchElementException();
     }
 
     public String getPrimaryKey(int tableid) {
-        if(idTableMap.containsKey(tableid)) {
-            return this.idTableMap.get(tableid).getPkeyField();
+        if(idToTable.containsKey(tableid)) {
+            return this.idToTable.get(tableid).getPkeyField();
         }
         throw new NoSuchElementException();
     }
 
     public Iterator<Integer> tableIdIterator() {
-        return this.idTableMap.keySet().iterator();
+        return this.idToTable.keySet().iterator();
     }
 
     public String getTableName(int id) {
-        if(idTableMap.containsKey(id)) {
-            return this.idTableMap.get(id).getName();
+        if(idToTable.containsKey(id)) {
+            return this.idToTable.get(id).getName();
         }
         throw new NoSuchElementException();
     }
 
     /** Delete all tables from the catalog */
     public void clear() {
-        this.idTableMap.clear();
-        this.nameTableMap.clear();
+        this.idToTable.clear();
+        this.nameToTable.clear();
+        this.tables.clear();
     }
 
     /**

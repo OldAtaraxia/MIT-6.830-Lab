@@ -18,7 +18,7 @@ public class Tuple implements Serializable {
     private static final long serialVersionUID = 1L;
     TupleDesc tableSchema; // 描述当前表的schema
     List<Field> fields; // 存储字段
-    RecordId recordId;
+    RecordId recordId; // 唯一标识符
 
     /**
      * Create a new tuple with the specified schema (type).
@@ -29,9 +29,9 @@ public class Tuple implements Serializable {
      */
     public Tuple(TupleDesc td) {
         this.tableSchema = td;
-        fields = new ArrayList<>();
+        fields = new ArrayList<>(td.numFields());
         for(int i = 0; i < td.numFields(); i++) {
-            fields.add(null);
+            fields.add(null); // 先把所有元素初始化为null
         }
     }
 
