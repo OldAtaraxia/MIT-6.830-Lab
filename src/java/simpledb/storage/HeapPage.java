@@ -52,19 +52,18 @@ public class HeapPage implements Page {
 
         // allocate and read the header slots of this page
         header = new byte[getHeaderSize()];
-        for (int i=0; i<header.length; i++)
+        for (int i = 0; i < header.length; i++)
             header[i] = dis.readByte();
         
         tuples = new Tuple[numSlots];
-        try{
+        try {
             // allocate and read the actual records of this page
-            for (int i=0; i<tuples.length; i++)
-                tuples[i] = readNextTuple(dis,i);
-        }catch(NoSuchElementException e){
+            for (int i = 0; i < tuples.length; i++)
+                tuples[i] = readNextTuple(dis, i);
+        } catch (NoSuchElementException e) {
             e.printStackTrace();
         }
         dis.close();
-
         setBeforeImage();
     }
 
@@ -138,7 +137,7 @@ public class HeapPage implements Page {
         RecordId rid = new RecordId(pid, slotId);
         t.setRecordId(rid);
         try {
-            for (int j=0; j<td.numFields(); j++) {
+            for (int j = 0; j < td.numFields(); j++) {
                 Field f = td.getFieldType(j).parse(dis);
                 t.setField(j, f);
             }
@@ -181,7 +180,7 @@ public class HeapPage implements Page {
 
             // empty slot
             if (!isSlotUsed(i)) {
-                for (int j=0; j<td.getSize(); j++) {
+                for (int j = 0; j < td.getSize(); j++) {
                     try {
                         dos.writeByte(0);
                     } catch (IOException e) {
@@ -251,6 +250,7 @@ public class HeapPage implements Page {
             throw new DbException("Tuple slot is already empty");
         } else {
             markSlotUsed(t.getRecordId().getTupleNumber(), false);
+            tuples[t.getRecordId().getTupleNumber()] = null; // 不知道是否有必要...
         }
     }
 
@@ -322,7 +322,7 @@ public class HeapPage implements Page {
      * (note that this iterator shouldn't return tuples in empty slots!)
      */
     public Iterator<Tuple> iterator() {
-        List<Tuple> useableTuples = new ArrayList<Tuple>();
+        List<Tuple> useableTuples = new ArrayList<>();
         for(int i = 0; i < numSlots; i++) {
             if(isSlotUsed(i)) {
                 useableTuples.add(tuples[i]);

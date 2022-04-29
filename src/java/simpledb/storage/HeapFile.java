@@ -145,9 +145,9 @@ public class HeapFile implements DbFile {
             if(pageNo < 0 || pageNo >= HeapFile.this.numPages()) {
                 throw new DbException("Page number out of bound");
             }
-            HeapPageId heapPageId = new HeapPageId(HeapFile.this.getId(), pageNo);
-            HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_ONLY);
-            return page.iterator();
+            HeapPageId heapPageId = new HeapPageId(HeapFile.this.getId(), pageNo); // 构建HeapPageId
+            HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_ONLY); // 通过BufferPool来得到Page
+            return page.iterator(); // 返回page.iterator
         }
 
         @Override
