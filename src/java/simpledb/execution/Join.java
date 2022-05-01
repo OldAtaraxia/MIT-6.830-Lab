@@ -13,6 +13,12 @@ import java.util.*;
 public class Join extends Operator {
 
     private static final long serialVersionUID = 1L;
+    // 定义成员
+    private JoinPredicate joinPredicate;
+    // 要作join的两个子算子
+    OpIterator child1;
+    OpIterator child2;
+    Tuple leftTuple = null;
 
     /**
      * Constructor. Accepts two children to join and the predicate to join them
@@ -26,12 +32,13 @@ public class Join extends Operator {
      *            Iterator for the right(inner) relation to join
      */
     public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
-        // some code goes here
+        this.joinPredicate = p;
+        this.child1 = child1;
+        this.child2 = child2;
     }
 
     public JoinPredicate getJoinPredicate() {
-        // some code goes here
-        return null;
+        return this.joinPredicate;
     }
 
     /**
@@ -40,8 +47,7 @@ public class Join extends Operator {
      *       alias or table name.
      * */
     public String getJoinField1Name() {
-        // some code goes here
-        return null;
+        return child1.getTupleDesc().getFieldName(joinPredicate.getField1());
     }
 
     /**
@@ -50,8 +56,7 @@ public class Join extends Operator {
      *       alias or table name.
      * */
     public String getJoinField2Name() {
-        // some code goes here
-        return null;
+        return child2.getTupleDesc().getFieldName(joinPredicate.getField2());
     }
 
     /**
@@ -59,21 +64,26 @@ public class Join extends Operator {
      *      implementation logic.
      */
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // some code goes here
+        child1.open();
+        child2.open();
+        super.open();
     }
 
     public void close() {
-        // some code goes here
+        super.close();
+        child1.close();
+        child2.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        // 还是得让child先rewind...
+        child1.rewind();
+        child2.rewind();
     }
 
     /**
@@ -95,19 +105,45 @@ public class Join extends Operator {
      * @see JoinPredicate#filter
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
+        // simple nested loop join
+
+        while (leftTuple != null || child1.hasNext()) {
+            if (leftTuple == null) leftTuple = child1.next();
+            while (child2.hasNext()) {
+                Tuple rightTuple = child2.next();
+                if (joinPredicate.filter(leftTuple, rightTuple)) {
+                    Tuple joinResult = new Tuple(TupleDesc.merge(leftTuple.getTupleDesc(), rightTuple.getTupleDesc()));
+
+                    // 设置leftTuple的Field
+                    for (int i = 0; i < leftTuple.getTupleDesc().numFields(); i++) {
+                        joinResult.setField(i, leftTuple.getField(i));
+                    }
+
+                    // 设置rightTuple的Field
+                    for (int i = 0; i < rightTuple.getTupleDesc().numFields(); i++) {
+                        joinResult.setField(i + leftTuple.getTupleDesc().numFields(), rightTuple.getField(i));
+                    }
+
+                    return joinResult;
+                }
+            }
+            child2.rewind();
+            leftTuple = null; // 直接置为null, 等待下一个child1.next()调用
+        }
         return null;
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        return new OpIterator[]{child1, child2};
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        if (child1 != children[0] || child2 != children[1]) {
+            child1 = children[0];
+            child2 = children[1];
+        }
     }
 
 }

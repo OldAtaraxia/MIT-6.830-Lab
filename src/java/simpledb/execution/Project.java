@@ -35,8 +35,8 @@ public class Project extends Operator {
                    OpIterator child) {
         this.child = child;
         outFieldIds = fieldList;
-        String[] fieldAr = new String[fieldList.size()];
-        TupleDesc childtd = child.getTupleDesc();
+        String[] fieldAr = new String[fieldList.size()]; // field对应的名字...
+        TupleDesc childtd = child.getTupleDesc(); // childOperator对应的tuple的tupleDesc
 
         for (int i = 0; i < fieldAr.length; i++) {
             fieldAr[i] = childtd.getFieldName(fieldList.get(i));
