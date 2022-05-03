@@ -113,17 +113,49 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public List<Page> insertTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
-        // some code goes here
-        return null;
-        // not necessary for lab1
+        List<Page> dirtyPages = new ArrayList<>();
+        // 遍历所有的Page
+        for (int i = 0; i < numPages(); i++) {
+            HeapPageId heapPageId = new HeapPageId(this.getId(), i); // 构建HeapPageId
+            HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE); // 通过BufferPool来得到Page
+            // 找到有empty slot的page, 这里理论上是需要加锁的...
+            if (page.getNumEmptySlots() != 0) {
+                page.markDirty(true, tid);
+                page.insertTuple(t);
+                dirtyPages.add(page);
+                break;
+            }
+        }
+        // 如果没有空Page
+        if (dirtyPages.isEmpty()) {
+            // 创建一个新Page
+            HeapPageId pageid = new HeapPageId(this.getId(), this.numPages());
+            HeapPage page = new HeapPage(pageid, HeapPage.createEmptyPageData());
+
+            // 附加在之前的file后面
+            writePage(page);
+
+            // 重复之前的从BufferPool读取并修改
+            page = (HeapPage) Database.getBufferPool().getPage(tid, pageid, Permissions.READ_WRITE);
+            page.markDirty(true, tid);
+            page.insertTuple(t);
+            dirtyPages.add(page);
+
+        }
+        return dirtyPages;
     }
 
     // see DbFile.java for javadocs
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
             TransactionAbortedException {
-        // some code goes here
-        return null;
-        // not necessary for lab1
+        ArrayList<Page> dirtyPages = new ArrayList<>();
+        PageId heapPageId = t.getRecordId().getPageId();
+        HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE);
+
+        page.markDirty(true, tid);
+        page.deleteTuple(t);
+        dirtyPages.add(page);
+        return dirtyPages;
     }
 
     // see DbFile.java for javadocs

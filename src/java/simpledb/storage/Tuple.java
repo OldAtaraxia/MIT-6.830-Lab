@@ -111,12 +111,30 @@ public class Tuple implements Serializable {
     /**
      * reset the TupleDesc of this tuple (only affecting the TupleDesc)
      * */
-    public void resetTupleDesc(TupleDesc td)
-    {
+    public void resetTupleDesc(TupleDesc td) {
         this.tableSchema = td;
         this.fields = new ArrayList<>();
         for(int i = 0; i < td.numFields(); i++) {
             fields.add(null);
         }
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof Tuple)) {
+            return false;
+        }
+
+        if (!this.getTupleDesc().equals(((Tuple) obj).getTupleDesc())) {
+            return false;
+        }
+
+        for (int i = 0; i < fields.size(); i++) {
+            if (!fields.get(i).equals(((Tuple) obj).getField(i))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

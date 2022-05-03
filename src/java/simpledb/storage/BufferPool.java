@@ -10,6 +10,8 @@ import simpledb.transaction.TransactionId;
 import javax.xml.crypto.Data;
 import java.io.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -151,8 +153,16 @@ public class BufferPool {
      */
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
-        // some code goes here
-        // not necessary for lab1
+        HeapFile heapfile = (HeapFile) Database.getCatalog().getDatabaseFile(tableId);
+        List<Page> dirtypages = heapfile.insertTuple(tid, t);
+        for (Page page : dirtypages) {
+            if (!this.pages.containsKey(page.getId())) {
+                while (this.pages.size() >= numPages) {
+                    evictPage();
+                }
+                this.pages.put(page.getId().hashCode(), page);
+            }
+        }
     }
 
     /**
@@ -170,8 +180,18 @@ public class BufferPool {
      */
     public  void deleteTuple(TransactionId tid, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
-        // some code goes here
-        // not necessary for lab1
+        HeapFile heapfile = (HeapFile) Database.getCatalog().getDatabaseFile(t.getRecordId().getPageId().getTableId());
+        ArrayList<Page> dirtypages = heapfile.deleteTuple(tid, t);
+
+        for (Page page : dirtypages) {
+            if (!this.pages.containsKey(page.getId())) {
+                while (this.pages.size() >= numPages) {
+                    evictPage();
+                }
+                this.pages.put(page.getId().hashCode(), page);
+            }
+        }
+
     }
 
     /**
