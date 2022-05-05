@@ -283,6 +283,7 @@ public class HeapPage implements Page {
                 markSlotUsed(i, true);
                 t.setRecordId(new RecordId(pid, i));
                 tuples[i] = t;
+                t.setRecordId(new RecordId(this.pid, i));
                 break;
             }
         }

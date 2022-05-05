@@ -155,10 +155,11 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         HeapFile heapfile = (HeapFile) Database.getCatalog().getDatabaseFile(tableId);
         List<Page> dirtypages = heapfile.insertTuple(tid, t);
+        System.out.println(dirtypages.size());
         for (Page page : dirtypages) {
             if (!this.pages.containsKey(page.getId())) {
                 while (this.pages.size() >= numPages) {
-                    evictPage();
+                    evictPage(); // 在这个方法中对脏页进行写盘操作
                 }
                 this.pages.put(page.getId().hashCode(), page);
             }

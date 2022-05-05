@@ -123,6 +123,7 @@ public class HeapFile implements DbFile {
                 page.markDirty(true, tid);
                 page.insertTuple(t);
                 dirtyPages.add(page);
+                // 不需要把脏页写盘, 之后在BufferPool中写盘
                 break;
             }
         }
@@ -132,16 +133,16 @@ public class HeapFile implements DbFile {
             HeapPageId pageid = new HeapPageId(this.getId(), this.numPages());
             HeapPage page = new HeapPage(pageid, HeapPage.createEmptyPageData());
 
-            // 附加在之前的file后面
-            writePage(page);
-
             // 重复之前的从BufferPool读取并修改
-            page = (HeapPage) Database.getBufferPool().getPage(tid, pageid, Permissions.READ_WRITE);
+            // page = (HeapPage) Database.getBufferPool().getPage(tid, pageid, Permissions.READ_WRITE);
             page.markDirty(true, tid);
             page.insertTuple(t);
             dirtyPages.add(page);
 
+            // 把新建立的Page写盘, 附加在之前的file后面
+            writePage(page);
         }
+        // System.out.println(dirtyPages.size());
         return dirtyPages;
     }
 
