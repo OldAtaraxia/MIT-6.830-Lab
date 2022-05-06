@@ -11,7 +11,9 @@ import javax.xml.crypto.Data;
 import java.io.*;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -40,6 +42,9 @@ public class BufferPool {
     private int numPages;
     private ConcurrentHashMap<Integer, Page> pages;
 
+    // tools for lru
+    private Queue<PageId> lruCache;
+
     /**
      * Creates a BufferPool that caches up to numPages pages.
      *
@@ -48,6 +53,7 @@ public class BufferPool {
     public BufferPool(int numPages) {
         this.numPages = numPages;
         this.pages = new ConcurrentHashMap<Integer, Page>();
+        this.lruCache = new LinkedList<>();
     }
     
     public static int getPageSize() {
@@ -88,7 +94,13 @@ public class BufferPool {
             if(dbFile == null) {
                 throw new DbException("Page does not exist");
             }
+
+            while (this.pages.size() > numPages) {
+                evictPage();
+            }
+
             this.pages.put(pid.hashCode(), dbFile.readPage(pid));
+            this.lruCache.add(pid);
             return this.pages.get(pid.hashCode());
         }
     }
@@ -162,6 +174,7 @@ public class BufferPool {
                     evictPage(); // 在这个方法中对脏页进行写盘操作
                 }
                 this.pages.put(page.getId().hashCode(), page);
+                this.lruCache.add(page.getId());
             }
         }
     }
@@ -201,8 +214,10 @@ public class BufferPool {
      *     break simpledb if running in NO STEAL mode.
      */
     public synchronized void flushAllPages() throws IOException {
-        // some code goes here
-        // not necessary for lab1
+        for (Integer key : this.pages.keySet()) {
+            Page page = this.pages.get(key);
+            flushPage(page.getId());
+        }
 
     }
 
@@ -215,8 +230,7 @@ public class BufferPool {
         are removed from the cache so they can be reused safely
     */
     public synchronized void discardPage(PageId pid) {
-        // some code goes here
-        // not necessary for lab1
+        this.pages.remove(pid.hashCode());
     }
 
     /**
@@ -224,8 +238,13 @@ public class BufferPool {
      * @param pid an ID indicating the page to flush
      */
     private synchronized  void flushPage(PageId pid) throws IOException {
-        // some code goes here
-        // not necessary for lab1
+        Page page = this.pages.get(pid.hashCode());
+        if (page.isDirty() != null) {
+            // 需要把脏页写回磁盘, 调用DbFile的getPage方法
+            DbFile file = Database.getCatalog().getDatabaseFile(page.getId().getTableId());
+            file.writePage(page);
+        }
+        discardPage(pid);
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -240,8 +259,21 @@ public class BufferPool {
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
     private synchronized  void evictPage() throws DbException {
-        // some code goes here
-        // not necessary for lab1
+        if (this.pages.size() < numPages) {
+            throw new DbException("buffer pool hasn't been full");
+        }
+
+        PageId top = lruCache.remove();
+        if (top == null) {
+            return;
+        }
+
+        try {
+            flushPage(top);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
 }
