@@ -139,7 +139,8 @@ public class BTreeFileReadTest extends SimpleDbTestBase {
 	/**
 	 * Unit test for BTreeFile.indexIterator()
 	 */
-	@Test public void indexIterator() throws Exception {
+	@Test
+	public void indexIterator() throws Exception {
 		BTreeFile twoLeafPageFile = BTreeUtility.createBTreeFile(2, 520,
 				null, null, 0);
 		Field f =  new IntField(5);
